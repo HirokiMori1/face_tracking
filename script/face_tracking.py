@@ -16,6 +16,9 @@ from control_msgs.msg import JointTrajectoryControllerState as JTCS
 #X軸　x[pixel] = 479 * rad
 #Y軸　y[pixel] = 
 
+robot = hsrb_interface.Robot()
+whole_body = robot.get('whole_body')
+
 class FaceTracking:
     def __init__(self):
         self.detection_subscriber =rospy.Subscriber("/darknet_ros/bounding_boxes", BoundingBoxes, self.detect_face_callback)
@@ -43,6 +46,11 @@ class FaceTracking:
 
 		if -0.03 <= delta_pan_joint and delta_pan_joint <= 0.03:
 			delta_pan_joint = 0
+        #現在のheadの角度を取得
+        #joint_names: [head_tilt_joint, head_pan_joint]
+        current_head_joint = rospy.wait_for_message("/hsrb/head_trajectory_controller/state", JTCS, timeout=None)
+        current_pan_joint = current_head_joint.desired.positions[1] #[rad]
+        current_tilt_joint = current_head_joint.desired.positions[0] #[rad]
 
         whole_body.move_to_joint_positions({'head_pan_joint': 0.0, 'head_tilt_joint': 0.0})
 
