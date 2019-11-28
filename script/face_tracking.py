@@ -13,8 +13,8 @@ from darknet_ros_msgs.msg import BoundingBoxes,BoundingBox
 from control_msgs.msg import JointTrajectoryControllerState as JTCS
 
 
-#X軸　x[pixel] = 479 * rad
-#Y軸　y[pixel] = 
+#X軸の角度の変化とpixelの変化の関数　x[pixel] = 479 * rad
+#Y軸の角度の変化とpixelの変化の関数　y[pixel] = 
 
 robot = hsrb_interface.Robot()
 whole_body = robot.get('whole_body')
@@ -40,11 +40,13 @@ class FaceTracking:
                 print(self.face_point_x, self.face_point_y)
                 max_prob = i.probability
     
-    def move_hsr_head(self):'
+    def move_hsr_head(self):
         #X軸方向に頭を動かす角度を計算[rad]
         delta_pan_joint = (self.image_center_x - self.face_point_x) / 479.0 
+        #Y軸方向に頭を動かす角度を計算[rad]
+        delta_tilt_joint = 0.0
 
-		if -0.03 <= delta_pan_joint and delta_pan_joint <= 0.03:
+        if -0.03 <= delta_pan_joint and delta_pan_joint <= 0.03:
 			delta_pan_joint = 0
         #現在のheadの角度を取得
         #joint_names: [head_tilt_joint, head_pan_joint]
@@ -52,10 +54,16 @@ class FaceTracking:
         current_pan_joint = current_head_joint.desired.positions[1] #[rad]
         current_tilt_joint = current_head_joint.desired.positions[0] #[rad]
 
-        whole_body.move_to_joint_positions({'head_pan_joint': 0.0, 'head_tilt_joint': 0.0})
+        whole_body.move_to_joint_positions({'head_pan_joint': current_pan_joint + delta_pan_joint, 'head_tilt_joint': current_tilt_joint + delta_tilt_joint})
 
 
 if __name__ == '__main__':
-    rospy.init_node("face_tracking")
+    #rospy.init_node("face_tracking")
     facetrack = FaceTracking()
+
+    rate = rospy.Rate(60)
+    while not rospy.is_shutdown():
+        facetrack.move_hsr_head()
+        rate.sleep()
+
     rospy.spin()
