@@ -8,7 +8,7 @@ import numpy as np
 import message_filters
 from sensor_msgs.msg import Image
 from cv_bridge import CvBridge, CvBridgeError
-from darknet_ros_msgs.msg import BoundingBoxes,BoundingBox
+from darknet_ros_msgs.msg import BoundingBoxes,BoundingBox,ObjectCount
 
 from control_msgs.msg import JointTrajectoryControllerState as JTCS
 
@@ -19,6 +19,7 @@ from control_msgs.msg import JointTrajectoryControllerState as JTCS
 robot = hsrb_interface.Robot()
 whole_body = robot.get('whole_body')
 
+#HSRの頭の可動範囲
 min_pan_joint = -3.8
 max_pan_joint = 1.7
 
@@ -28,12 +29,15 @@ max_tilt_joint = 0.52
 class FaceTracking:
     def __init__(self):
         self.detection_subscriber =rospy.Subscriber("/darknet_ros/bounding_boxes", BoundingBoxes, self.detect_face_callback)
+        self.foundobject_subscriber = rospy.Subscriber("/darknet_ros/found_object", ObjectCount, self.detect_object)
 
         self.face_point_x = 0 #顔の中心のX座標[pixel]
         self.face_point_y = 0 #顔の中心のY座標[pixel]
 
         self.image_center_x = 320 #画像の中心のX座標
         self.image_center_y = 240 #画像の中心のY座標
+
+        self.is_detect_object = 0 #オブジェクト検出フラグ
 
     def detect_face_callback(self,  detection_data):
 
@@ -45,6 +49,11 @@ class FaceTracking:
                 self.face_point_y = i.ymin + (i.ymax - i.ymin) / 2 
                 print(self.face_point_x, self.face_point_y)
                 max_prob = i.probability
+
+    #オブジェクトを検出しているかを判定
+    def detect_object(self, object_data):
+        self.is_detect_object = 0 if object_data.count == 0 else 1 #オブジェクト検出数が0ならオブジェクト検出フラグを0にする
+        print(self.is_detect_object)
     
     def move_hsr_head(self):
         #X軸方向に頭を動かす角度を計算[rad]
@@ -77,8 +86,10 @@ class FaceTracking:
         elif move_tilt_joint >= max_tilt_joint:
             move_tilt_joint = max_tilt_joint
 
-        whole_body.move_to_joint_positions({'head_pan_joint': move_pan_joint, 'head_tilt_joint': move_tilt_joint})
-
+        if self.is_detect_object != 0:
+            whole_body.move_to_joint_positions({'head_pan_joint': move_pan_joint, 'head_tilt_joint': move_tilt_joint})
+        elif self.is_detect_object == 0:
+            whole_body.move_to_joint_positions({'head_pan_joint': 0.0, 'head_tilt_joint': 0.0})
 
 if __name__ == '__main__':
     #rospy.init_node("face_tracking")
