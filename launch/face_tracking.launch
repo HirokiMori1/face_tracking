@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<launch>
+    <node pkg="face_tracking" name="face_tracking" type="face_tracking.py"/>
+</launch>
