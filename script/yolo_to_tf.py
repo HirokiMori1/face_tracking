@@ -12,8 +12,7 @@ from geometry_msgs.msg import PointStamped
 import tf2_geometry_msgs
 import tf2_ros
 
-
-
+np.set_printoptions(threshold=np.inf)
 
 class Sample:
     def __init__(self):
@@ -34,15 +33,14 @@ class Sample:
     def calc_distance(self, depth_data, image_data):
         depth = self.bridge.imgmsg_to_cv2(depth_data, desired_encoding='passthrough')
         img = self.bridge.imgmsg_to_cv2(image_data, "bgr8")
+        #print(depth)
+        #print "###############################################"
         #TODO:
         y = image_data.height/2
         x = image_data.width/2
 
-        print(x,y)
-
         ray = self.pinhole.projectPixelTo3dRay([x, y])
         camera_point = np.array(ray) * depth[y, x]
-        print(camera_point)
 
         cam_point = PointStamped()
         cam_point.header.frame_id = image_data.header.frame_id
@@ -50,8 +48,8 @@ class Sample:
         cam_point.point.y = camera_point[1]
         cam_point.point.z = camera_point[2]
 
-        base_stamp = self.tfBuffer.transform(cam_point, "base_link", timeout=rospy.Duration(5))
-        #print(base_stamp)
+        base_stamp = self.tfBuffer.transform(cam_point, "base_footprint", timeout=rospy.Duration(5))
+        print(base_stamp)
 
 
 if __name__ == "__main__":

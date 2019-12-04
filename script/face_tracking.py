@@ -7,6 +7,7 @@ import cv2
 import numpy as np
 import message_filters
 from sensor_msgs.msg import Image
+from geometry_msgs.msg import Point
 from cv_bridge import CvBridge, CvBridgeError
 from darknet_ros_msgs.msg import BoundingBoxes,BoundingBox,ObjectCount
 
@@ -30,6 +31,8 @@ class FaceTracking:
     def __init__(self):
         self.detection_subscriber =rospy.Subscriber("/darknet_ros/bounding_boxes", BoundingBoxes, self.detect_face_callback)
         self.foundobject_subscriber = rospy.Subscriber("/darknet_ros/found_object", ObjectCount, self.detect_object)
+        #顔の位置のPublisher
+        self.point_pub = rospy.Publisher('face_point', Point, queue_size=10)
 
         self.face_point_x = 0 #顔の中心のX座標[pixel]
         self.face_point_y = 0 #顔の中心のY座標[pixel]
@@ -41,19 +44,33 @@ class FaceTracking:
 
     def detect_face_callback(self,  detection_data):
 
-        max_prob = detection_data.bounding_boxes[0].probability #確率の最大値
+        point_x = 0.0
+        point_y = 0.0
+
+        max_prob = 0.0 #確率の最大値
         #確率の最も大きなボックスの中心座標を計算
         for i in detection_data.bounding_boxes:
             if i.probability >= max_prob:
-                self.face_point_x = i.xmin + (i.xmax - i.xmin) / 2
-                self.face_point_y = i.ymin + (i.ymax - i.ymin) / 2 
-                print(self.face_point_x, self.face_point_y)
+                point_x = i.xmin + (i.xmax - i.xmin) / 2
+                point_y = i.ymin + (i.ymax - i.ymin) / 2 
                 max_prob = i.probability
+
+        self.face_point_x = point_x
+        self.face_point_y = point_y
+
+        face_point = Point()
+
+        face_point.x = point_x
+        face_point.y = point_y
+        face_point.z = 0
+        #顔の位置をpublish
+        self.point_pub.publish(face_point)
 
     #オブジェクトを検出しているかを判定
     def detect_object(self, object_data):
         self.is_detect_object = 0 if object_data.count == 0 else 1 #オブジェクト検出数が0ならオブジェクト検出フラグを0にする
-        print(self.is_detect_object)
+        #print(self.is_detect_object)
+
     
     def move_hsr_head(self):
         #X軸方向に頭を動かす角度を計算[rad]
@@ -72,6 +89,7 @@ class FaceTracking:
         current_pan_joint = current_head_joint.desired.positions[1] #[rad]
         current_tilt_joint = current_head_joint.desired.positions[0] #[rad]
 
+        #頭を動かす角度の計算[rad]
         move_pan_joint = current_pan_joint + delta_pan_joint
         move_tilt_joint = current_tilt_joint + delta_tilt_joint
 
@@ -88,14 +106,14 @@ class FaceTracking:
 
         if self.is_detect_object != 0:
             whole_body.move_to_joint_positions({'head_pan_joint': move_pan_joint, 'head_tilt_joint': move_tilt_joint})
-        elif self.is_detect_object == 0:
+        elif self.is_detect_object == 0: #検出している物体がなかったら原点に戻す
             whole_body.move_to_joint_positions({'head_pan_joint': 0.0, 'head_tilt_joint': 0.0})
 
 if __name__ == '__main__':
     #rospy.init_node("face_tracking")
     facetrack = FaceTracking()
 
-    rate = rospy.Rate(60)
+    rate = rospy.Rate(5)
     while not rospy.is_shutdown():
         facetrack.move_hsr_head()
         rate.sleep()

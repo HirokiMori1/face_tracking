@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 
 <launch>
-    <include file="$(find darknet_ros)/launch/face.launch">
+    <include file="$(find darknet_ros)/launch/yolov3-tiny_face.launch">
     </include>
     <node pkg="face_tracking" name="face_tracking" type="face_tracking.py"/>
 </launch>
